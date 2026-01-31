@@ -16,7 +16,11 @@ export function getApiBase() {
   if (isDev && BASE === '/api') {
     return 'http://localhost:3000'
   }
-  // In production or if custom base is set
+  // In production, if BASE is relative (starts with /), use current origin
+  if (BASE.startsWith('/')) {
+    return typeof window !== 'undefined' ? window.location.origin : ''
+  }
+  // If BASE is absolute URL, extract the base without /api
   return BASE.replace('/api', '')
 }
 
