@@ -114,7 +114,9 @@ const PORT = process.env.PORT || 4000
 async function start() {
   // try to use alter in dev to update DB schema when models change
   try {
-    await sequelize.sync({ alter: true })
+    // In production, avoid alter: true to prevent SQLite constraint errors and data loss risks
+    const isProd = process.env.NODE_ENV === 'production'
+    await sequelize.sync({ alter: !isProd })
   } catch (e) {
     console.error('Sequelize sync with { alter: true } failed:', e)
     console.error('Falling back to sequelize.sync() (no alter).')
