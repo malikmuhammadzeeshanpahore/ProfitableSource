@@ -10,6 +10,7 @@ export default function Deposit() {
   const [file, setFile] = useState(null)
   const [sentWith, setSentWith] = useState('JazzCash') // New field: which app was used to send
   const [history, setHistory] = useState([])
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -27,13 +28,17 @@ export default function Deposit() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (submitting) return // Prevent double submission
     if (!amount || Number(amount) < 200) { toast.show('Minimum injection Rs 200', 'error'); return }
     if (!transactionId) { toast.show('Transaction ID is required for verification.', 'error'); return }
+    if (!file) { toast.show('Screenshot is required for verification.', 'error'); return }
 
+    setSubmitting(true)
     try {
       const r = await api.createDeposit(amount, 'SadaPay', transactionId, file, sentWith)
       if (r.error) {
         toast.show(r.error, 'error')
+        setSubmitting(false)
         return
       }
       toast.show('Capital injection initiated. Verification in progress...', 'success')
@@ -42,8 +47,14 @@ export default function Deposit() {
       setFile(null)
       const h = await api.getDeposits()
       if (h.deposits) setHistory(h.deposits)
+
+      // Keep button locked for 3 seconds to prevent rapid resubmission
+      setTimeout(() => {
+        setSubmitting(false)
+      }, 3000)
     } catch (e) {
       toast.show('Sync error: Could not submit deposit.', 'error')
+      setSubmitting(false)
     }
   }
 
@@ -120,8 +131,8 @@ export default function Deposit() {
               <input placeholder="Enter the 11-digit TID" value={transactionId} onChange={e => setTransactionId(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Screenshot</label>
-              <input type="file" className="cursor-pointer" onChange={e => setFile(e.target.files[0])} />
+              <label>Screenshot (Required)</label>
+              <input type="file" accept="image/*" className="cursor-pointer" onChange={e => setFile(e.target.files[0])} required />
             </div>
             <button className="btn-premium w-full mt-4 py-4">Verify Deposit</button>
           </form>

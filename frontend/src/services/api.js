@@ -8,8 +8,17 @@ if (!configured) {
   configured = '/api'
 }
 // ensure no trailing slash
-configured = configured.replace(/\/$/, '')
-const BASE = configured
+const BASE = configured.replace(/\/$/, '')
+
+// Export function to get full backend URL (for uploads, etc.)
+export function getApiBase() {
+  // In development, backend is on port 3000
+  if (isDev && BASE === '/api') {
+    return 'http://localhost:3000'
+  }
+  // In production or if custom base is set
+  return BASE.replace('/api', '')
+}
 
 if (isDev) console.info('[api] running in development mode, API base =', BASE)
 
@@ -270,6 +279,10 @@ export async function adminUnbanUser(userId) {
   return f(`/admin/users/${encodeURIComponent(userId)}/unban`, { method: 'POST', headers: adminHeaders() })
 }
 
+export async function adminPromoteUser(userId) {
+  return f(`/admin/users/${encodeURIComponent(userId)}/promote`, { method: 'POST', headers: adminHeaders() })
+}
+
 export async function adminDeleteUser(userId) {
   return f(`/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE', headers: adminHeaders() })
 }
@@ -303,7 +316,7 @@ export default {
   adminGetWithdraws, adminMarkWithdrawSent, adminConfirmWithdraw,
   adminApproveWithdraw, adminRejectWithdraw,
   adminGetUser, adminActivatePackage, adminLinkReferral, adminReconcileReferralBonuses, adminReconcilePurchases, adminManualReferralBonus, adminGetEvents, adminGetVisits,
-  adminBanUser, adminUnbanUser, adminDeleteUser, adminSendBonus, adminManualActivatePackage,
+  adminBanUser, adminUnbanUser, adminPromoteUser, adminDeleteUser, adminSendBonus, adminManualActivatePackage,
   // events & post
   postEvent,
   // secrets & auth

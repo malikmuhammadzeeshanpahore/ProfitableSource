@@ -16,6 +16,7 @@ import LandingHeader from './components/LandingHeader'
 import Sidebar from './components/Sidebar'
 import Footer from './components/Footer'
 import JoinChannelModal from './components/JoinChannelModal'
+import RegistrationBonusModal from './components/RegistrationBonusModal'
 import ErrorBoundary from './components/ErrorBoundary'
 import FloatingSocial from './components/FloatingSocial'
 
@@ -74,6 +75,7 @@ export default function App() {
           {showSidebar && <Sidebar />}
           <main className="content-area">
             <JoinChannelModal />
+            <RegistrationBonusModal />
             <div className="content-section">
               <ErrorBoundary>
                 <Routes>

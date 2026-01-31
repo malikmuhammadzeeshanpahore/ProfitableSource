@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react'
-import api from '../services/api'
+import api, { getApiBase } from '../services/api'
 import { useToast } from '../components/Toast'
 
+const API_BASE = getApiBase()
+
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState('users')
-  const [users, setUsers] = useState([])
+  const [activeTab, setActiveTab] = useState('deposits')
   const [deposits, setDeposits] = useState([])
   const [withdraws, setWithdraws] = useState([])
+  const [users, setUsers] = useState([])
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(false)
   const [packages, setPackages] = useState([])
@@ -164,6 +166,8 @@ export default function Admin() {
     e.preventDefault()
     if (!bonusUserId || !bonusAmount) return
     try {
+      const r = await api.adminSendBonus(bonusUserId, Number(bonusAmount))
+      if (r.error) throw new Error(r.error)
       toast.show(`Bonus of Rs ${bonusAmount} sent!`, 'success')
       setBonusAmount(''); setBonusUserId('')
       await loadData()
@@ -301,24 +305,41 @@ export default function Admin() {
             <div className="admin-table-container">
               <table className="admin-table">
                 <thead>
-                  <tr>
-                    <th>User</th>
-                    <th>Amount</th>
-                    <th>Method/TID</th>
-                    <th className="text-right">Decision</th>
+                  <tr className="border-b border-white/10">
+                    <th className="text-left p-4">User</th>
+                    <th className="text-left p-4">Amount</th>
+                    <th className="text-left p-4">Method</th>
+                    <th className="text-left p-4">Transaction ID</th>
+                    <th className="text-left p-4">Screenshot</th>
+                    <th className="text-right p-4">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {deposits.map(d => (
-                    <tr key={d.id}>
+                    <tr key={d.id} className="border-b border-white/5 hover:bg-white/5">
                       <td className="p-4">
-                        <div className="font-bold text-white">{d.User?.name}</div>
-                        <div className="text-[10px] text-text-dim">{d.User?.phone}</div>
+                        <div className="font-bold text-white">{d.User?.name || 'Unknown'}</div>
+                        <div className="text-[10px] text-text-dim">{d.User?.phone || d.User?.email}</div>
                       </td>
-                      <td className="p-4 font-bold text-green-500">Rs {d.amount}</td>
                       <td className="p-4">
-                        <div className="text-[10px] uppercase font-bold">{d.method}</div>
-                        <div className="text-[10px] text-accent font-mono">TID: {d.transactionId}</div>
+                        <div className="text-white font-bold">Rs {d.amount?.toFixed(2)}</div>
+                        <div className="text-[9px] text-text-dim">{new Date(d.createdAt).toLocaleString()}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-[10px] uppercase font-bold text-accent">{d.method || 'N/A'}</div>
+                        <div className="text-[9px] text-text-dim">via {d.sentWith || 'N/A'}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-mono text-[11px] text-white">{d.transactionId || 'N/A'}</div>
+                      </td>
+                      <td className="p-4">
+                        {d.screenshot ? (
+                          <a href={d.screenshot.startsWith('http') ? d.screenshot : `${API_BASE}${d.screenshot}`} target="_blank" rel="noopener noreferrer" className="text-accent hover:text-accent-light">
+                            <img src={d.screenshot.startsWith('http') ? d.screenshot : `${API_BASE}${d.screenshot}`} alt="Payment proof" className="w-16 h-16 object-cover rounded border border-accent/30 hover:scale-150 transition-transform cursor-pointer" />
+                          </a>
+                        ) : (
+                          <span className="text-text-dim text-[10px]">No screenshot</span>
+                        )}
                       </td>
                       <td className="p-4 text-right space-x-2">
                         <button onClick={() => handleApproveDeposit(d.id)} className="btn-premium py-2 px-4 text-[10px]">Approve</button>
@@ -326,7 +347,7 @@ export default function Admin() {
                       </td>
                     </tr>
                   ))}
-                  {deposits.length === 0 && <tr><td colSpan="4" className="p-12 text-center text-text-dim">No pending injection requests.</td></tr>}
+                  {deposits.length === 0 && <tr><td colSpan="6" className="p-12 text-center text-text-dim">No pending injection requests.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -346,7 +367,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {withdraws.map(w => {
+                  {withdraws.filter(w => w.status === 'pending').map(w => {
                     const meta = typeof w.meta === 'string' ? JSON.parse(w.meta) : (w.meta || {})
                     const user = w.User || {}
                     return (

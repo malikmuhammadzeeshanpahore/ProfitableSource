@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../components/Toast'
 
 export default function Wallet() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('de_user')
     return saved ? JSON.parse(saved) : null
@@ -30,11 +32,25 @@ export default function Wallet() {
 
   async function handleWithdraw(e) {
     e.preventDefault()
+
+    // Check if withdrawal info is complete
+    if (!user?.payoutName || !user?.payoutMethod || !user?.payoutAccount) {
+      toast.show('Please complete your withdrawal details in Profile first', 'error')
+      setTimeout(() => {
+        navigate('/profile')
+      }, 1500)
+      return
+    }
+
     if (!amount || Number(amount) < 30) { toast.show('Minimum withdrawal threshold: Rs 30', 'error'); return }
     setLoading(true)
     try {
       const r = await api.withdraw({ amount, method: payoutMethod, account: user?.payoutAccount || 'Not set' })
-      if (r.error) { toast.show(r.error, 'error'); return }
+      if (r.error) {
+        toast.show(r.error, 'error')
+        setLoading(false)
+        return
+      }
       toast.show('Liquidation request initiated successfully.', 'success')
       setAmount('')
       const meRes = await api.me()
@@ -45,7 +61,10 @@ export default function Wallet() {
       }
       const txRes = await api.getTransactions()
       if (txRes.transactions) setTxs(txRes.transactions)
-    } catch (e) { toast.show('Signal failure', 'error') }
+    } catch (e) {
+      console.error('Withdrawal error:', e)
+      toast.show('Signal failure', 'error')
+    }
     finally { setLoading(false) }
   }
 

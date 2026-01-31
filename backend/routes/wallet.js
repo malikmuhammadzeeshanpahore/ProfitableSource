@@ -23,17 +23,7 @@ router.post('/withdraw', authenticate, async (req, res) => {
   if (!amount || amount < 30) return res.status(400).json({ error: 'Minimum withdraw is 30' })
   if (req.user.wallet < amount) return res.status(400).json({ error: 'Insufficient balance' })
 
-  // allow only one withdrawal per calendar day (server local date)
-  try {
-    const now = new Date()
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-    const todayWithdraws = await models.Transaction.count({ where: { userId: req.user.id, type: 'withdraw', createdAt: { [Op.between]: [start, end] } } })
-    if (todayWithdraws && todayWithdraws > 0) return res.status(400).json({ error: 'Only one withdrawal allowed per day' })
-    // allowed time window: 12:00 (noon) to 24:00 (midnight)
-    const hour = now.getHours()
-    if (!(hour >= 12 && hour < 24)) return res.status(400).json({ error: 'Withdrawals are allowed between 12:00 PM and 12:00 AM only' })
-  } catch (e) { console.error('Withdraw check failed', e); return res.status(500).json({ error: 'server' }) }
+  // No withdrawal limits - users can withdraw anytime, any number of times per day
 
   // apply 10% tax/fee
   const fee = Math.round((amount * 0.10) * 100) / 100

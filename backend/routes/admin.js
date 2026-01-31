@@ -493,8 +493,22 @@ router.post('/users/:id/unban', allowAdminOrSecret(async (req, res) => {
 router.delete('/users/:id', allowAdminOrSecret(async (req, res) => {
   const user = await models.User.findByPk(req.params.id)
   if (!user) return res.status(404).json({ error: 'Not found' })
-  await user.destroy()
-  res.json({ ok: true })
+
+  try {
+    // Delete all related records first to avoid foreign key constraints
+    // Order matters: delete child records before parent
+    await models.Transaction.destroy({ where: { userId: user.id } })
+    await models.Deposit.destroy({ where: { userId: user.id } })
+    await models.UserPackage.destroy({ where: { userId: user.id } })
+    await models.LoginEvent.destroy({ where: { userId: user.id } })
+
+    // Now safe to delete the user
+    await user.destroy()
+    res.json({ ok: true })
+  } catch (e) {
+    console.error('User deletion error:', e)
+    res.status(500).json({ error: 'Failed to delete user and related records' })
+  }
 }))
 
 // Manual Bonus Balance
