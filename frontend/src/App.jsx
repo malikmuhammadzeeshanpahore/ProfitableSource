@@ -33,13 +33,42 @@ export default function App() {
   const auth = !!localStorage.getItem('de_user')
   const isLanding = location.pathname === '/'
   const isAuthPage = location.pathname === '/auth'
-  const showSidebar = auth && !isLanding
-  const showHeader = !isLanding && !isAuthPage
+
+  // Landing page gets its own full-width layout
+  if (isLanding) {
+    return (
+      <ToastProvider>
+        <ErrorBoundary>
+          <Landing />
+        </ErrorBoundary>
+      </ToastProvider>
+    )
+  }
+
+  // Auth page gets minimal layout
+  if (isAuthPage) {
+    return (
+      <ToastProvider>
+        <div className="app-layout no-sidebar">
+          <div className="main-wrapper">
+            <main className="content-area">
+              <ErrorBoundary>
+                <Auth />
+              </ErrorBoundary>
+            </main>
+          </div>
+        </div>
+      </ToastProvider>
+    )
+  }
+
+  // Dashboard pages get full layout with sidebar
+  const showSidebar = auth
 
   return (
     <ToastProvider>
       <div className={`app-layout ${showSidebar ? 'has-sidebar' : 'no-sidebar'}`}>
-        {showHeader && <Header />}
+        <Header />
         <div className="main-wrapper">
           {showSidebar && <Sidebar />}
           <main className="content-area">
@@ -47,8 +76,6 @@ export default function App() {
             <div className="content-section">
               <ErrorBoundary>
                 <Routes>
-                  <Route path="/" element={<Landing />} />
-                  <Route path="/auth" element={<Auth />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/packages" element={<Packages />} />
                   <Route path="/wallet" element={<Wallet />} />
