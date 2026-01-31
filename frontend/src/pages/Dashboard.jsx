@@ -34,16 +34,16 @@ export default function Dashboard() {
     return () => window.removeEventListener('userUpdate', onUserUpdate)
   }, [])
 
-  // Activity Feed
-  const [events, setEvents] = useState([])
+  // Recent Activity Feed (claims, deposits, withdrawals)
+  const [activities, setActivities] = useState([])
   useEffect(() => {
-    async function loadEvents() {
+    async function loadActivities() {
       try {
-        const r = await api.getEvents()
-        if (r.events) setEvents(r.events)
-      } catch (e) { }
+        const r = await api.getRecentActivity()
+        if (r.activities) setActivities(r.activities)
+      } catch (e) { console.error('Failed to load activities', e) }
     }
-    loadEvents()
+    loadActivities()
   }, [])
 
   async function claimFor(upId) {
@@ -151,20 +151,57 @@ export default function Dashboard() {
             <i className="ri-notification-3-line text-accent"></i> Recent Activity
           </h3>
           <div className="glass-card p-6 space-y-4 mb-8">
-            {events.length === 0 ? (
+            {activities.length === 0 ? (
               <div className="text-center text-text-dim text-xs py-4">No recent activity</div>
-            ) : events.slice(0, 5).map((ev, i) => (
-              <div key={i} className="flex gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors border-l-2 border-transparent hover:border-accent">
-                <div className="w-2 h-2 mt-2 rounded-full bg-accent/50"></div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-accent px-2 py-0.5 rounded bg-accent/10">{ev.type}</span>
+            ) : activities.slice(0, 10).map((activity, i) => {
+              // Determine icon and description based on activity type
+              let icon = 'ri-history-line'
+              let description = 'Activity'
+              let statusColor = 'bg-white/10'
+
+              if (activity.type === 'deposit') {
+                icon = 'ri-download-line'
+                description = `Deposit of Rs ${activity.amount}`
+                statusColor = activity.status === 'approved' ? 'bg-green-500/20 text-green-400' :
+                  activity.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                    'bg-yellow-500/20 text-yellow-400'
+              } else if (activity.type === 'withdraw') {
+                icon = 'ri-upload-line'
+                description = `Withdrawal of Rs ${activity.amount}`
+                statusColor = activity.status === 'approved' ? 'bg-green-500/20 text-green-400' :
+                  activity.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                    'bg-yellow-500/20 text-yellow-400'
+              } else if (activity.type === 'daily') {
+                icon = 'ri-gift-line'
+                description = `Daily claim of Rs ${activity.amount}`
+                statusColor = 'bg-accent/20 text-accent'
+              } else if (activity.type === 'registration_bonus') {
+                icon = 'ri-gift-2-line'
+                description = `Registration bonus of Rs ${activity.amount}`
+                statusColor = 'bg-accent/20 text-accent'
+              } else if (activity.type === 'referral') {
+                icon = 'ri-user-add-line'
+                description = `Referral commission of Rs ${activity.amount}`
+                statusColor = 'bg-accent/20 text-accent'
+              }
+
+              return (
+                <div key={i} className="flex gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors border-l-2 border-transparent hover:border-accent">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-white/5">
+                    <i className={`${icon} text-accent`}></i>
                   </div>
-                  <p className="text-xs text-text-primary leading-tight">{ev.description || 'Activity recorded'}</p>
-                  <span className="text-[10px] text-text-dim uppercase tracking-tighter">{new Date(ev.createdAt).toLocaleString()}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${statusColor}`}>
+                        {activity.type === 'deposit' || activity.type === 'withdraw' ? activity.status : activity.type}
+                      </span>
+                    </div>
+                    <p className="text-xs text-text-primary leading-tight">{description}</p>
+                    <span className="text-[10px] text-text-dim uppercase tracking-tighter">{new Date(activity.createdAt).toLocaleString()}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="glass-card p-6 bg-accent/5 border-accent/20 mb-8">
@@ -207,12 +244,12 @@ export default function Dashboard() {
                 <div className="text-[10px] text-text-dim font-black uppercase tracking-widest mb-2">Your Referral Link</div>
                 <div className="flex items-center justify-between gap-4">
                   <div className="text-sm font-mono text-white truncate flex-1">
-                    {user?.inviteCode ? `https://profitablesource.com/?ref=${user.inviteCode}` : 'Loading...'}
+                    {user?.inviteCode ? `${window.location.origin}/auth?tab=signup&ref=${user.inviteCode}` : 'Loading...'}
                   </div>
                   <button
                     onClick={() => {
                       if (user?.inviteCode) {
-                        const link = `https://profitablesource.com/?ref=${user.inviteCode}`
+                        const link = `${window.location.origin}/auth?tab=signup&ref=${user.inviteCode}`
                         navigator.clipboard.writeText(link)
                         toast.show('Referral link copied!', 'success')
                       }

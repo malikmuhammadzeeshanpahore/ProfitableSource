@@ -86,4 +86,64 @@ router.post('/claim', authenticate, async (req, res) => {
   } catch (e) { console.error('Claim error', e); return res.status(500).json({ error: 'server' }) }
 })
 
+// get recent activity (claims, deposits, withdrawals)
+router.get('/recent-activity', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const limit = 20 // Show last 20 activities
+
+    // Fetch recent transactions (claims)
+    const transactions = await models.Transaction.findAll({
+      where: { userId },
+      order: [['createdAt', 'DESC']],
+      limit: limit,
+      attributes: ['id', 'type', 'amount', 'status', 'createdAt', 'meta']
+    })
+
+    // Fetch recent deposits
+    const deposits = await models.Deposit.findAll({
+      where: { userId },
+      order: [['createdAt', 'DESC']],
+      limit: limit,
+      attributes: ['id', 'amount', 'status', 'createdAt', 'method']
+    })
+
+    // Combine and format activities
+    const activities = []
+
+    // Add transactions (claims, withdrawals)
+    transactions.forEach(tx => {
+      activities.push({
+        id: tx.id,
+        type: tx.type,
+        amount: tx.amount,
+        status: tx.status || 'completed',
+        createdAt: tx.createdAt,
+        meta: tx.meta
+      })
+    })
+
+    // Add deposits
+    deposits.forEach(dep => {
+      activities.push({
+        id: dep.id,
+        type: 'deposit',
+        amount: dep.amount,
+        status: dep.status,
+        createdAt: dep.createdAt,
+        meta: { method: dep.method }
+      })
+    })
+
+    // Sort by createdAt descending and limit
+    activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    const recentActivities = activities.slice(0, limit)
+
+    return res.json({ activities: recentActivities })
+  } catch (e) {
+    console.error('Recent activity error', e)
+    return res.status(500).json({ error: 'server' })
+  }
+})
+
 module.exports = router

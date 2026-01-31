@@ -92,6 +92,10 @@ export async function claimRegistration() {
   return f('/wallet/claim-registration', { method: 'POST' })
 }
 
+export async function getRecentActivity() {
+  return f('/wallet/recent-activity')
+}
+
 export async function submitDeposit({ accountHolder, transactionId, amount, method, screenshotFile, packageId, sentWith }) {
   const form = new FormData()
   form.append('accountHolder', accountHolder || 'User')
@@ -290,7 +294,7 @@ export const getDeposits = getMyDeposits
 export default {
   signup, login, me, getPackages, getMyPackages, getUserPackages, claimPackage, buyPackage,
   getBalance, getTransactions, withdraw, submitDeposit, createDeposit, getMyDeposits, getDeposits,
-  claimDaily,
+  claimDaily, claimRegistration, getRecentActivity,
   updateMe, getReferralStats,
   // admin helpers
   adminGetDeposits, adminApproveDeposit, adminRejectDeposit,

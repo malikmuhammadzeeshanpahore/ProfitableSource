@@ -4,13 +4,15 @@ import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast'
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true)
+  const urlParams = new URLSearchParams(window.location.search)
+  const tabParam = urlParams.get('tab')
+  const refParam = urlParams.get('ref')
+
+  const [isLogin, setIsLogin] = useState(tabParam !== 'signup') // Auto-switch to signup if tab=signup
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [inviteCode, setInviteCode] = useState(() => {
-    return new URLSearchParams(window.location.search).get('ref') || ''
-  })
+  const [inviteCode, setInviteCode] = useState(refParam || '')
   const navigate = useNavigate()
   const toast = useToast()
 
