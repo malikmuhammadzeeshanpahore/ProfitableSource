@@ -14,3 +14,7 @@ backend/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Ignore data.sqlite database file
+data.sqlite
+backend/data.sqlite
