@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import api from '../services/api'
 import { useToast } from '../components/Toast'
 import copyToClipboard from '../utils/clipboard'
+import TeamStats from '../components/TeamStats'
 
 export default function Profile() {
   const toast = useToast()
@@ -127,6 +128,14 @@ export default function Profile() {
               <h4 className="font-bold text-sm mb-2">Notice</h4>
               <p className="text-xs text-text-secondary leading-relaxed">Please make sure your withdrawal details are 100% correct. We are not responsible for funds sent to wrong accounts.</p>
             </div>
+          </div>
+
+          {/* Team Statistics Section */}
+          <div className="glass-card p-8">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <i className="ri-team-line text-accent"></i> Team Statistics
+            </h3>
+            <TeamStats userId={user.id} />
           </div>
         </div>
       </div>

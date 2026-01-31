@@ -68,7 +68,7 @@ app.use('/api/events', eventsRoutes)
 const { authenticate } = require('./middleware/auth')
 app.post('/api/deposits', authenticate, upload.single('screenshot'), async (req, res) => {
   try {
-    const { accountHolder, transactionId, amount, method, packageId } = req.body
+    const { accountHolder, transactionId, amount, method, packageId, sentWith } = req.body
     const raw = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || ''
     const { normalizeIp } = require('./utils/ip')
     const submitIp = normalizeIp(raw)
@@ -91,7 +91,8 @@ app.post('/api/deposits', authenticate, upload.single('screenshot'), async (req,
       packageId: packageId || null,
       screenshot: req.file ? '/uploads/' + req.file.filename : null,
       status: 'pending',
-      submitIp
+      submitIp,
+      meta: { sentWith: sentWith || null } // Store which app was used to send payment
     })
     // do not activate user until admin approval
     return res.json({ deposit })

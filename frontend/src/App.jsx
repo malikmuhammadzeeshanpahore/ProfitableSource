@@ -17,6 +17,7 @@ import Sidebar from './components/Sidebar'
 import Footer from './components/Footer'
 import JoinChannelModal from './components/JoinChannelModal'
 import ErrorBoundary from './components/ErrorBoundary'
+import FloatingSocial from './components/FloatingSocial'
 
 import { ToastProvider } from './components/Toast'
 import { startUserSync, stopUserSync } from './services/userSync'
@@ -91,6 +92,7 @@ export default function App() {
           </main>
           <Footer />
         </div>
+        <FloatingSocial />
       </div>
     </ToastProvider>
   )

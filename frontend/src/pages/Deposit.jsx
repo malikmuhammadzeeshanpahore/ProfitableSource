@@ -8,7 +8,7 @@ export default function Deposit() {
   const [amount, setAmount] = useState('')
   const [transactionId, setTransactionId] = useState('')
   const [file, setFile] = useState(null)
-  const [method, setMethod] = useState('JazzCash')
+  const [sentWith, setSentWith] = useState('JazzCash') // New field: which app was used to send
   const [history, setHistory] = useState([])
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function Deposit() {
     if (!transactionId) { toast.show('Transaction ID is required for verification.', 'error'); return }
 
     try {
-      const r = await api.createDeposit(amount, method, transactionId, file)
+      const r = await api.createDeposit(amount, 'SadaPay', transactionId, file, sentWith)
       if (r.error) {
         toast.show(r.error, 'error')
         return
@@ -47,38 +47,18 @@ export default function Deposit() {
     }
   }
 
-  const methods = [
-    { id: 'JazzCash', name: 'JazzCash', icon: 'ri-smartphone-line' },
-    { id: 'EasyPaisa', name: 'EasyPaisa', icon: 'ri-smartphone-line' },
-    { id: 'manual', name: 'Bank Transfer', icon: 'ri-bank-card-line' }
-  ]
-
   return (
     <div className="animate-premium-in max-w-2xl mx-auto space-y-8">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">Deposit Funds</h1>
-        <p className="text-text-secondary">Choose a payment method to add funds to your wallet.</p>
+        <p className="text-text-secondary">Send funds to our SadaPay account to add balance to your wallet.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {methods.map(m => (
-          <div
-            key={m.id}
-            onClick={() => setMethod(m.id)}
-            className={`glass-card p-4 cursor-pointer transition-all border-2 ${method === m.id ? 'border-accent bg-accent/10' : 'border-transparent hover:border-white/10'}`}
-          >
-            <div className="text-center">
-              <i className={`${m.icon} text-3xl mb-2 ${method === m.id ? 'text-accent' : 'text-text-secondary'}`}></i>
-              <div className="font-bold">{m.name}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
+      {/* SadaPay Info Card */}
       <div className="glass-card p-8 animate-fade-in space-y-6">
         <div>
           <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <i className="ri-bank-card-line text-accent"></i> Account Details
+            <i className="ri-bank-card-line text-accent"></i> SadaPay Account Details
           </h3>
           <div className="space-y-4">
             <div className="flex gap-4 p-4 glass-card bg-accent/5">
@@ -91,14 +71,14 @@ export default function Deposit() {
                 <div className="text-[10px] text-text-dim font-black uppercase tracking-widest mb-1">Method</div>
                 <div className="text-xl font-bold tracking-tight text-white flex items-center justify-end gap-2">
                   <span className="h-2 w-2 rounded-full bg-accent animate-pulse"></span>
-                  {method === 'manual' ? 'Bank Transfer' : method}
+                  SadaPay
                 </div>
               </div>
             </div>
 
             <div className="glass-card p-6 border-accent/20 flex items-center justify-between group hover:border-accent transition-all duration-500">
               <div>
-                <div className="text-[10px] text-text-dim font-black uppercase tracking-widest mb-1">Account Number</div>
+                <div className="text-[10px] text-text-dim font-black uppercase tracking-widest mb-1">SadaPay Number</div>
                 <div className="text-3xl font-black tracking-tighter text-white group-hover:text-accent transition-colors">03000000000</div>
               </div>
               <button
@@ -119,12 +99,21 @@ export default function Deposit() {
             <i className="ri-upload-cloud-2-line text-accent"></i> Submit Payment Proof
           </h3>
           <p className="text-sm text-text-secondary leading-relaxed mb-6">
-            Please enter the amount you sent and upload the transaction screenshot for verification.
+            Send money to the SadaPay number above, then enter the details below for verification.
           </p>
           <form className="premium-form" onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Amount (Rs)</label>
               <input type="number" placeholder="Enter amount sent" value={amount} onChange={e => setAmount(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>Sent with (Payment App)</label>
+              <select value={sentWith} onChange={e => setSentWith(e.target.value)} className="w-full">
+                <option value="JazzCash">JazzCash</option>
+                <option value="EasyPaisa">EasyPaisa</option>
+                <option value="SadaPay">SadaPay</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
             <div className="form-group">
               <label>Transaction ID (TID)</label>

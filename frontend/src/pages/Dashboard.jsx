@@ -172,90 +172,57 @@ export default function Dashboard() {
             <p className="text-xs text-text-secondary leading-relaxed">Please make sure your withdrawal details are correct in <strong>Profile</strong> to avoid any delay in payments.</p>
           </div>
 
-          <div className="glass-card p-6 border-accent/20">
-            <h4 className="font-bold text-base mb-6 text-white">Official Support</h4>
-            <div className="flex flex-col gap-4">
 
-              <a
-                href="https://t.me/profitablesource_offical_service"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="contact-card group"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '16px',
-                  padding: '1.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '1rem',
-                  textDecoration: 'none',
-                  color: 'white',
-                  transition: 'all 0.3s ease',
-                  cursor: 'pointer'
-                }}
-              >
-                <i className="ri-telegram-fill text-2xl" style={{ color: '#0088cc' }}></i>
-                <div className="contact-info">
-                  <div className="contact-label font-bold text-base">Telegram</div>
-                  <div className="contact-value text-sm text-gray-400">Official Service</div>
+          {/* Referral Invite Section */}
+          <div className="glass-card p-8">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <i className="ri-user-add-line text-accent"></i> Invite Friends
+            </h3>
+            <p className="text-sm text-text-secondary mb-6">
+              Share your referral code or link to invite friends and earn commissions on their first deposit.
+            </p>
+
+            <div className="space-y-4">
+              {/* Referral Code */}
+              <div className="glass-card p-6 border-accent/20">
+                <div className="text-[10px] text-text-dim font-black uppercase tracking-widest mb-2">Your Invite Code</div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-2xl font-black tracking-tight text-white">{user?.inviteCode || 'Loading...'}</div>
+                  <button
+                    onClick={() => {
+                      if (user?.inviteCode) {
+                        navigator.clipboard.writeText(user.inviteCode)
+                        toast.show('Invite code copied!', 'success')
+                      }
+                    }}
+                    className="h-12 w-12 rounded-xl bg-white/5 hover:bg-accent hover:text-white transition-all duration-300 flex items-center justify-center"
+                  >
+                    <i className="ri-file-copy-line text-lg"></i>
+                  </button>
                 </div>
-              </a>
+              </div>
 
-              <a
-                href="https://whatsapp.com/channel/0029VbBiOW9Dp2QC0PlpvB3V"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="contact-card group"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '16px',
-                  padding: '1.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '1rem',
-                  textDecoration: 'none',
-                  color: 'white',
-                  transition: 'all 0.3s ease',
-                  cursor: 'pointer'
-                }}
-              >
-                <i className="ri-whatsapp-fill text-2xl" style={{ color: '#25D366' }}></i>
-                <div className="contact-info">
-                  <div className="contact-label font-bold text-base">WhatsApp</div>
-                  <div className="contact-value text-sm text-gray-400">Official Channel</div>
+              {/* Referral Link */}
+              <div className="glass-card p-6 border-accent/20">
+                <div className="text-[10px] text-text-dim font-black uppercase tracking-widest mb-2">Your Referral Link</div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-sm font-mono text-white truncate flex-1">
+                    {user?.inviteCode ? `https://profitablesource.com/?ref=${user.inviteCode}` : 'Loading...'}
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (user?.inviteCode) {
+                        const link = `https://profitablesource.com/?ref=${user.inviteCode}`
+                        navigator.clipboard.writeText(link)
+                        toast.show('Referral link copied!', 'success')
+                      }
+                    }}
+                    className="h-12 w-12 rounded-xl bg-white/5 hover:bg-accent hover:text-white transition-all duration-300 flex items-center justify-center flex-shrink-0"
+                  >
+                    <i className="ri-file-copy-line text-lg"></i>
+                  </button>
                 </div>
-              </a>
-
-              <a
-                href="/downloads/profitable_source.apk"
-                download
-                className="contact-card group"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '16px',
-                  padding: '1.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '1rem',
-                  textDecoration: 'none',
-                  color: 'white',
-                  transition: 'all 0.3s ease',
-                  cursor: 'pointer'
-                }}
-              >
-                <i className="ri-download-cloud-fill text-2xl text-accent"></i>
-                <div className="contact-info">
-                  <div className="contact-label font-bold text-base">Download App</div>
-                  <div className="contact-value text-sm text-gray-400">Mobile Experience</div>
-                </div>
-              </a>
-
+              </div>
             </div>
           </div>
         </div>

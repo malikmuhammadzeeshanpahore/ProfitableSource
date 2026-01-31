@@ -92,12 +92,13 @@ export async function claimRegistration() {
   return f('/wallet/claim-registration', { method: 'POST' })
 }
 
-export async function submitDeposit({ accountHolder, transactionId, amount, method, screenshotFile, packageId }) {
+export async function submitDeposit({ accountHolder, transactionId, amount, method, screenshotFile, packageId, sentWith }) {
   const form = new FormData()
   form.append('accountHolder', accountHolder || 'User')
   form.append('transactionId', transactionId)
   form.append('amount', amount)
   form.append('method', method)
+  if (sentWith) form.append('sentWith', sentWith)
   if (packageId) form.append('packageId', packageId)
   if (screenshotFile) form.append('screenshot', screenshotFile)
 
@@ -110,11 +111,12 @@ export async function submitDeposit({ accountHolder, transactionId, amount, meth
   return res.json()
 }
 
-export const createDeposit = (amount, method, tid, file) => submitDeposit({
+export const createDeposit = (amount, method, tid, file, sentWith) => submitDeposit({
   amount,
   method,
   transactionId: tid,
   screenshotFile: file,
+  sentWith,
   accountHolder: 'User'
 })
 

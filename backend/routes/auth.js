@@ -33,14 +33,8 @@ router.post('/signup', async (req, res) => {
       const refUser = await models.User.findOne({ where: { inviteCode: referral } })
       if (refUser) referredBy = refUser.id
     }
-    const user = await models.User.create({ id, name, email, phone, password: hashed, referralCode: referral || null, inviteCode, referredBy, signupIp, registrationBonusPending: false, registrationBonusClaimedAt: new Date() })
-    // give new user a registration bonus (50 PKR)
-    try {
-      const bonus = 50
-      user.wallet = (user.wallet || 0) + bonus
-      await user.save()
-      await models.Transaction.create({ id: 't' + Date.now(), userId: user.id, type: 'registration_bonus', amount: bonus, meta: {} })
-    } catch (e) { console.error('Failed to credit signup bonus', e) }
+    const user = await models.User.create({ id, name, email, phone, password: hashed, referralCode: referral || null, inviteCode, referredBy, signupIp, registrationBonusPending: true })
+    // Registration bonus of Rs 20 is now pending - user can claim it from wallet page
     const token = createToken(user)
 
     // record signup event
@@ -116,11 +110,20 @@ router.get('/referrals', authenticate, async (req, res) => {
     // level 3
     const level3 = level2Ids.length ? await models.User.findAll({ where: { referredBy: level2Ids }, attributes: ['id', 'name', 'email', 'createdAt'] }) : []
     const level3Ids = level3.map(u => u.id)
-    const teamIds = [...level1Ids, ...level2Ids, ...level3Ids]
+    // level 4 (new)
+    const level4 = level3Ids.length ? await models.User.findAll({ where: { referredBy: level3Ids }, attributes: ['id', 'name', 'email', 'createdAt'] }) : []
+    const level4Ids = level4.map(u => u.id)
+    const teamIds = [...level1Ids, ...level2Ids, ...level3Ids, ...level4Ids]
 
     // sum of referral earnings for this user (transactions of type 'referral')
     const referrals = await models.Transaction.findAll({ where: { userId, type: 'referral' } })
     const totalReferralEarnings = referrals.reduce((s, r) => s + (r.amount || 0), 0)
+
+    // Commission breakdown by level
+    const levelACommission = referrals.filter(r => r.meta && r.meta.level === 'A').reduce((s, r) => s + (r.amount || 0), 0)
+    const levelBCommission = referrals.filter(r => r.meta && r.meta.level === 'B').reduce((s, r) => s + (r.amount || 0), 0)
+    const levelCCommission = referrals.filter(r => r.meta && r.meta.level === 'C').reduce((s, r) => s + (r.amount || 0), 0)
+    const levelDCommission = referrals.filter(r => r.meta && r.meta.level === 'D').reduce((s, r) => s + (r.amount || 0), 0)
 
     // sum of team investments (approved deposits)
     let teamInvestment = 0
@@ -129,7 +132,25 @@ router.get('/referrals', authenticate, async (req, res) => {
       teamInvestment = deps.reduce((s, d) => s + (d.amount || 0), 0)
     }
 
-    return res.json({ levels: { level1: level1.length, level2: level2.length, level3: level3.length, total: teamIds.length }, teamInvestment, referralEarnings: totalReferralEarnings, referrals: referrals, directMembers: level1 })
+    return res.json({
+      levels: {
+        level1: level1.length,
+        level2: level2.length,
+        level3: level3.length,
+        level4: level4.length,
+        total: teamIds.length
+      },
+      teamInvestment,
+      referralEarnings: totalReferralEarnings,
+      commissionBreakdown: {
+        levelA: levelACommission,
+        levelB: levelBCommission,
+        levelC: levelCCommission,
+        levelD: levelDCommission
+      },
+      referrals: referrals,
+      directMembers: level1
+    })
   } catch (e) { console.error('Referral stats failed', e); return res.status(500).json({ error: 'server' }) }
 })
 

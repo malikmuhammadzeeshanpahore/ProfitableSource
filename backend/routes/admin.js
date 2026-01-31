@@ -90,42 +90,53 @@ router.post('/deposits/:id/approve', allowAdminOrSecret(async (req, res) => {
   await user.save()
   await models.Transaction.create({ id: 't' + Date.now(), userId: user.id, type: 'deposit', amount: dep.amount, meta: { depositId: dep.id } })
 
-  // 3-LEVEL COMMISSION SYSTEM: 10% - 5% - 2%
+  // 4-LEVEL COMMISSION SYSTEM: Level A(10%) - B(5%) - C(2%) - D(0.2%)
+  // CRITICAL: Commission is ONLY paid on the FIRST approved deposit of each referred user
   try {
-    const levels = [0.10, 0.05, 0.02]
-    let currentRefId = user.referredBy
+    const levels = [
+      { rate: 0.10, label: 'A' },
+      { rate: 0.05, label: 'B' },
+      { rate: 0.02, label: 'C' },
+      { rate: 0.002, label: 'D' }
+    ]
 
-    // Only pay commission if this is the user's first approved deposit? 
-    // User requested "commission sirf deposit karne wale users ka milega" -> implies on every deposit or just active ones?
-    // Usually "Levels" implies volume. I will apply to ALL approved deposits as is standard for this request unless specified "First Deposit Only"
-    // The previous code had "if (approvedCount === 1)". The user said "jis user ko invite kia he usne koi deposit nahi kia to... commission sirf deposit karne wale users ka milega".
-    // This implies commission is tied to DEPOSIT. I will apply it on EVERY deposit for maximum user satisfaction unless restricted. 
-    // However, to avoid draining funds, often it's first deposit. I'll stick to *First Deposit* logic if it was there, OR remove it if the user wants "commission ... ka milega".
-    // Re-reading: "Level A ko 10%... agar jis user ko invite kia he usne koi deposit nahi kia to... commission sirf deposit karne wale users ka milega"
-    // This means commission is triggered by DEPOSIT. I will allow it on ALL deposits for now to be generous, or restrict to first if safety is needed.
-    // Let's stick to **ALL DEPOSITS** as the prompt implies ongoing commission ("Level A ko 10%..."). 
+    // Check if this is the user's first approved deposit
+    const approvedCount = await models.Deposit.count({
+      where: { userId: user.id, status: 'approved' }
+    })
 
-    for (let i = 0; i < levels.length; i++) {
-      if (!currentRefId) break
-      const referrer = await models.User.findByPk(currentRefId)
-      if (!referrer) break
+    // Only distribute commission if this is the first approved deposit
+    if (approvedCount === 1) {
+      let currentRefId = user.referredBy
 
-      const rate = levels[i]
-      const commission = Math.round((dep.amount * rate) * 100) / 100
+      for (let i = 0; i < levels.length; i++) {
+        if (!currentRefId) break
+        const referrer = await models.User.findByPk(currentRefId)
+        if (!referrer) break
 
-      if (commission > 0) {
-        referrer.wallet = (referrer.wallet || 0) + commission
-        await referrer.save()
-        await models.Transaction.create({
-          id: 't' + Date.now() + '_ref_l' + (i + 1),
-          userId: referrer.id,
-          type: 'referral_bonus',
-          amount: commission,
-          status: 'completed',
-          meta: { fromUser: user.id, depositId: dep.id, level: i + 1, rate: rate }
-        })
+        const { rate, label } = levels[i]
+        const commission = Math.round((dep.amount * rate) * 100) / 100
+
+        if (commission > 0) {
+          referrer.wallet = (referrer.wallet || 0) + commission
+          await referrer.save()
+          await models.Transaction.create({
+            id: 't' + Date.now() + '_ref_l' + label,
+            userId: referrer.id,
+            type: 'referral',
+            amount: commission,
+            status: 'completed',
+            meta: {
+              fromUser: user.id,
+              depositId: dep.id,
+              level: label,
+              rate: rate,
+              referredUserId: user.id
+            }
+          })
+        }
+        currentRefId = referrer.referredBy
       }
-      currentRefId = referrer.referredBy
     }
   } catch (e) { console.error('Failed to process referral commission', e) }
 
