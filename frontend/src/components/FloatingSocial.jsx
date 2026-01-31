@@ -1,33 +1,31 @@
 import React from 'react'
 
 export default function FloatingSocial() {
-    return (
-        <div className="fixed right-6 bottom-24 z-50 flex flex-col gap-4">
-            {/* Telegram Icon */}
-            <button
-                onClick={() => {
-                    // Link removed temporarily per user request
-                    // Will add: window.open('https://t.me/profitablesource_offical_service', '_blank')
-                }}
-                className="floating-social-btn telegram"
-                title="Telegram"
-            >
-                <i className="ri-telegram-fill text-2xl"></i>
-            </button>
+  return (
+    <div className="fixed right-6 bottom-24 z-50 flex flex-col gap-4">
+      {/* Telegram Icon */}
+      <button
+        onClick={() => {
+          window.open('https://t.me/profitablesource_offical_service', '_blank')
+        }}
+        className="floating-social-btn telegram"
+        title="Telegram"
+      >
+        <i className="ri-telegram-fill text-2xl"></i>
+      </button>
 
-            {/* WhatsApp Icon */}
-            <button
-                onClick={() => {
-                    // Link removed temporarily per user request
-                    // Will add: window.open('https://whatsapp.com/channel/...', '_blank')
-                }}
-                className="floating-social-btn whatsapp"
-                title="WhatsApp"
-            >
-                <i className="ri-whatsapp-fill text-2xl"></i>
-            </button>
+      {/* WhatsApp Icon */}
+      <button
+        onClick={() => {
+          window.open('https://whatsapp.com/channel/0029VbBiOW9Dp2QC0PlpvB3V', '_blank')
+        }}
+        className="floating-social-btn whatsapp"
+        title="WhatsApp"
+      >
+        <i className="ri-whatsapp-fill text-2xl"></i>
+      </button>
 
-            <style jsx>{`
+      <style jsx>{`
         .floating-social-btn {
           width: 56px;
           height: 56px;
@@ -66,6 +64,6 @@ export default function FloatingSocial() {
           }
         }
       `}</style>
-        </div>
-    )
+    </div>
+  )
 }

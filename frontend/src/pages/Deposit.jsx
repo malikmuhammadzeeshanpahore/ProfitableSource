@@ -79,11 +79,11 @@ export default function Deposit() {
             <div className="glass-card p-6 border-accent/20 flex items-center justify-between group hover:border-accent transition-all duration-500">
               <div>
                 <div className="text-[10px] text-text-dim font-black uppercase tracking-widest mb-1">SadaPay Number</div>
-                <div className="text-3xl font-black tracking-tighter text-white group-hover:text-accent transition-colors">03000000000</div>
+                <div className="text-3xl font-black tracking-tighter text-white group-hover:text-accent transition-colors">03344379353</div>
               </div>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText('03000000000')
+                  navigator.clipboard.writeText('03344379353')
                   toast.show('Number copied to clipboard', 'info')
                 }}
                 className="h-14 w-14 rounded-2xl bg-white/5 @include flex-center hover:bg-accent hover:text-white transition-all duration-300"
