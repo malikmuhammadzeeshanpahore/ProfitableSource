@@ -1,0 +1,4 @@
+Sequelize sync with { alter: true } failed: Validation error
+Falling back to sequelize.sync() (no alter).
+If you need to apply model schema changes, consider removing the SQLite file at backend/data.sqlite to recreate the schema (make a backup first).
+Backend running on 4000 and bound to 0.0.0.0

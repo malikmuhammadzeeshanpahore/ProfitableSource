@@ -1,0 +1,161 @@
+const express = require('express')
+const router = express.Router()
+const { models } = require('../models')
+const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken')
+const geoip = require('geoip-lite')
+
+const SECRET = process.env.JWT_SECRET || 'dev_secret'
+
+function createToken(user) {
+  return jwt.sign({ id: user.id, role: user.role }, SECRET, { expiresIn: '7d' })
+}
+
+// signup
+router.post('/signup', async (req, res) => {
+  try {
+    const { name, email, phone, password, referral } = req.body
+    const rawIp = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || ''
+    const { normalizeIp } = require('../utils/ip')
+    const signupIp = normalizeIp(rawIp)
+    if (!email || !password) return res.status(400).json({ error: 'email & password required' })
+    const exists = await models.User.findOne({ where: { email } })
+    if (exists) return res.status(400).json({ error: 'User exists' })
+    // IP-based signup restrictions disabled — allow signups from any IP
+
+    const hashed = await bcrypt.hash(password, 10)
+    const id = 'u' + Date.now()
+    // generate an invite code for this user
+    const inviteCode = 'INV' + Math.random().toString(36).substring(2, 8).toUpperCase()
+    // if referral is provided, try to resolve referring user by inviteCode
+    let referredBy = null
+    if (referral) {
+      const refUser = await models.User.findOne({ where: { inviteCode: referral } })
+      if (refUser) referredBy = refUser.id
+    }
+    const user = await models.User.create({ id, name, email, phone, password: hashed, referralCode: referral || null, inviteCode, referredBy, signupIp, registrationBonusPending: false, registrationBonusClaimedAt: new Date() })
+    // give new user a registration bonus (50 PKR)
+    try {
+      const bonus = 50
+      user.wallet = (user.wallet || 0) + bonus
+      await user.save()
+      await models.Transaction.create({ id: 't' + Date.now(), userId: user.id, type: 'registration_bonus', amount: bonus, meta: {} })
+    } catch (e) { console.error('Failed to credit signup bonus', e) }
+    const token = createToken(user)
+
+    // record signup event
+    try {
+      const geo = geoip.lookup(signupIp) || null
+      await models.LoginEvent.create({ userId: user.id, email: user.email, phone: user.phone, ip: signupIp, geo, userAgent: req.headers['user-agent'] || null })
+    } catch (e) { console.error('Failed to record signup loginEvent', e) }
+
+    return res.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, wallet: user.wallet, inviteCode: user.inviteCode }, token })
+  } catch (e) { console.error(e); return res.status(500).json({ error: 'server' }) }
+})
+
+// login
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body
+    const user = await models.User.findOne({ where: { email } })
+    if (!user) return res.status(400).json({ error: 'Invalid credentials' })
+    const ok = await bcrypt.compare(password, user.password)
+    if (!ok) return res.status(400).json({ error: 'Invalid credentials' })
+    const token = createToken(user)
+
+    // record login event
+    try {
+      const rawIp = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || ''
+      const { normalizeIp } = require('../utils/ip')
+      const loginIp = normalizeIp(rawIp)
+      const geo = geoip.lookup(loginIp) || null
+      await models.LoginEvent.create({ userId: user.id, email: user.email, phone: user.phone, ip: loginIp, geo, userAgent: req.headers['user-agent'] || null })
+    } catch (e) { console.error('Failed to record login loginEvent', e) }
+
+    // Get highest plan
+    let highestPlan = 'No Active Plan'
+    if (user.currentPackageId) {
+      const pkg = await models.Package.findByPk(user.currentPackageId)
+      if (pkg) highestPlan = pkg.name
+    }
+
+    // Get referral count
+    const referralCount = await models.User.count({ where: { referredBy: user.id } })
+
+    return res.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, wallet: user.wallet, isActive: user.isActive, inviteCode: user.inviteCode, referredBy: user.referredBy, currentPackageId: user.currentPackageId, packageExpiresAt: user.packageExpiresAt, payoutName: user.payoutName, payoutMethod: user.payoutMethod, payoutAccount: user.payoutAccount, registrationBonusPending: user.registrationBonusPending, highestPlan, referralCount }, token })
+  } catch (e) { console.error(e); return res.status(500).json({ error: 'server' }) }
+})
+
+// current user
+const { authenticate } = require('../middleware/auth')
+router.get('/me', authenticate, async (req, res) => {
+  const u = req.user
+  // Get highest plan
+  let highestPlan = 'No Active Plan'
+  if (u.currentPackageId) {
+    const pkg = await models.Package.findByPk(u.currentPackageId)
+    if (pkg) highestPlan = pkg.name
+  }
+
+  // Get referral count
+  const referralCount = await models.User.count({ where: { referredBy: u.id } })
+
+  return res.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role, wallet: u.wallet, isActive: u.isActive, inviteCode: u.inviteCode, referredBy: u.referredBy, currentPackageId: u.currentPackageId, packageExpiresAt: u.packageExpiresAt, payoutName: u.payoutName, payoutMethod: u.payoutMethod, payoutAccount: u.payoutAccount, registrationBonusPending: u.registrationBonusPending, highestPlan, referralCount } })
+})
+
+// referral stats for current user
+router.get('/referrals', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id
+    // level 1: direct referrals
+    const level1 = await models.User.findAll({ where: { referredBy: userId }, attributes: ['id', 'name', 'email', 'createdAt'] })
+    const level1Ids = level1.map(u => u.id)
+    // level 2
+    const level2 = level1Ids.length ? await models.User.findAll({ where: { referredBy: level1Ids }, attributes: ['id', 'name', 'email', 'createdAt'] }) : []
+    const level2Ids = level2.map(u => u.id)
+    // level 3
+    const level3 = level2Ids.length ? await models.User.findAll({ where: { referredBy: level2Ids }, attributes: ['id', 'name', 'email', 'createdAt'] }) : []
+    const level3Ids = level3.map(u => u.id)
+    const teamIds = [...level1Ids, ...level2Ids, ...level3Ids]
+
+    // sum of referral earnings for this user (transactions of type 'referral')
+    const referrals = await models.Transaction.findAll({ where: { userId, type: 'referral' } })
+    const totalReferralEarnings = referrals.reduce((s, r) => s + (r.amount || 0), 0)
+
+    // sum of team investments (approved deposits)
+    let teamInvestment = 0
+    if (teamIds.length) {
+      const deps = await models.Deposit.findAll({ where: { userId: teamIds, status: 'approved' } })
+      teamInvestment = deps.reduce((s, d) => s + (d.amount || 0), 0)
+    }
+
+    return res.json({ levels: { level1: level1.length, level2: level2.length, level3: level3.length, total: teamIds.length }, teamInvestment, referralEarnings: totalReferralEarnings, referrals: referrals, directMembers: level1 })
+  } catch (e) { console.error('Referral stats failed', e); return res.status(500).json({ error: 'server' }) }
+})
+
+// update profile (name only for demo)
+router.put('/me', authenticate, async (req, res) => {
+  const { name, payoutName, payoutMethod, payoutAccount } = req.body || {}
+  if (name) { req.user.name = name }
+  if (payoutName !== undefined) req.user.payoutName = payoutName
+  if (payoutMethod !== undefined) req.user.payoutMethod = payoutMethod
+  if (payoutAccount !== undefined) req.user.payoutAccount = payoutAccount
+  await req.user.save()
+  return res.json({ user: { id: req.user.id, name: req.user.name, email: req.user.email, wallet: req.user.wallet, isActive: req.user.isActive, inviteCode: req.user.inviteCode, payoutName: req.user.payoutName, payoutMethod: req.user.payoutMethod, payoutAccount: req.user.payoutAccount } })
+})
+
+// change password (authenticated)
+router.post('/change-password', authenticate, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body || {}
+    if (!oldPassword || !newPassword) return res.status(400).json({ error: 'oldPassword and newPassword required' })
+    const ok = await bcrypt.compare(oldPassword, req.user.password)
+    if (!ok) return res.status(400).json({ error: 'Invalid current password' })
+    const hashed = await bcrypt.hash(newPassword, 10)
+    req.user.password = hashed
+    await req.user.save()
+    return res.json({ ok: true })
+  } catch (e) { console.error('Change password failed', e); return res.status(500).json({ error: 'server' }) }
+})
+
+module.exports = router

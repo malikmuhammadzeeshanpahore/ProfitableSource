@@ -1,0 +1,157 @@
+const express = require('express')
+const cors = require('cors')
+const path = require('path')
+const multer = require('multer')
+const { sequelize, models, seed } = require('./models')
+const authRoutes = require('./routes/auth')
+const packageRoutes = require('./routes/packages')
+const taskRoutes = require('./routes/tasks')
+const walletRoutes = require('./routes/wallet')
+const adminRoutes = require('./routes/admin')
+const eventsRoutes = require('./routes/events')
+// comment
+const app = express()
+// When running behind nginx or other proxies, trust proxy headers so req.ip reflects client IP
+app.set('trust proxy', true)
+app.use(cors())
+app.use(express.json())
+
+// file uploads (screenshots)
+const uploadDir = path.join(__dirname, 'uploads')
+const fs = require('fs')
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true })
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_'))
+})
+const upload = multer({ storage })
+
+// expose uploaded images
+app.use('/uploads', express.static(uploadDir))
+
+// IP block middleware (honeypot)
+const { ipBlock } = require('./middleware/ipBlock')
+// Honeypot middleware can interfere with testing. Allow disabling via env var DISABLE_HONEYPOT=1
+if (process.env.DISABLE_HONEYPOT === '1') {
+  console.log('Honeypot middleware disabled via DISABLE_HONEYPOT=1')
+} else {
+  app.use(ipBlock)
+}
+
+// visitor logging middleware (captures IP, UA, path, method, timestamp)
+app.use(async (req, res, next) => {
+  try {
+    // skip static assets to avoid high volume (extensions)
+    if (req.path && req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|map)$/i)) return next()
+    const { getClientIp } = require('./utils/ip')
+    const { models } = require('./models')
+    const ip = getClientIp(req) || ''
+    const ua = req.headers['user-agent'] || null
+    const pathUrl = req.originalUrl || req.url || req.path
+    const method = req.method
+    const meta = { headers: { 'x-forwarded-for': req.headers['x-forwarded-for'] || null, 'x-real-ip': req.headers['x-real-ip'] || null, 'cf-connecting-ip': req.headers['cf-connecting-ip'] || null, forwarded: req.headers['forwarded'] || null } }
+    // don't await; log in background
+    models.Visit.create({ userId: (req.user && req.user.id) || null, ip, userAgent: ua, path: pathUrl, method, meta }).catch(e => { console.error('Failed to persist visit', e && e.message) })
+  } catch (e) { console.error('Visitor log middleware error', e && e.message) }
+  next()
+})
+
+// routes
+app.use('/api/auth', authRoutes)
+app.use('/api/packages', packageRoutes)
+app.use('/api/tasks', taskRoutes)
+app.use('/api/wallet', walletRoutes)
+app.use('/api/admin', adminRoutes)
+app.use('/api/events', eventsRoutes)
+
+// deposit upload endpoint (authenticated)
+const { authenticate } = require('./middleware/auth')
+app.post('/api/deposits', authenticate, upload.single('screenshot'), async (req, res) => {
+  try {
+    const { accountHolder, transactionId, amount, method, packageId } = req.body
+    const raw = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || ''
+    const { normalizeIp } = require('./utils/ip')
+    const submitIp = normalizeIp(raw)
+
+    // IP-based deposit restriction disabled — allow deposits from any IP
+    // Previously there was logic here to block deposits when another deposit existed from the same IP.
+    // That behavior has been disabled to avoid false positives for users behind NATs. Keep audit comment only.
+    // const other = submitIp ? await models.Deposit.findOne({ where: { submitIp } }) : null
+    // if(other && other.userId !== req.user.id){
+    //   console.log('Previously would have blocked deposit from IP', submitIp)
+    // }
+    if (!amount || !transactionId) return res.status(400).json({ error: 'Missing required fields' })
+    const deposit = await models.Deposit.create({
+      id: 'd' + Date.now(),
+      userId: req.user.id,
+      accountHolder,
+      transactionId,
+      amount: parseFloat(amount),
+      method,
+      packageId: packageId || null,
+      screenshot: req.file ? '/uploads/' + req.file.filename : null,
+      status: 'pending',
+      submitIp
+    })
+    // do not activate user until admin approval
+    return res.json({ deposit })
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// user's deposits
+app.get('/api/deposits', authenticate, async (req, res) => {
+  const deps = await models.Deposit.findAll({ where: { userId: req.user.id }, order: [['createdAt', 'DESC']] })
+  res.json({ deposits: deps })
+})
+
+// health
+app.get('/api/health', (req, res) => res.json({ ok: true }))
+
+const PORT = process.env.PORT || 4000
+async function start() {
+  // try to use alter in dev to update DB schema when models change
+  try {
+    await sequelize.sync({ alter: true })
+  } catch (e) {
+    console.error('Sequelize sync with { alter: true } failed:', e)
+    console.error('Falling back to sequelize.sync() (no alter).')
+    console.error('If you need to apply model schema changes, consider removing the SQLite file at backend/data.sqlite to recreate the schema (make a backup first).')
+    try {
+      await sequelize.sync()
+    } catch (err2) {
+      console.error('Fallback sequelize.sync() also failed:', err2)
+      console.error('Cannot start server. To reset the database, remove backend/data.sqlite and restart. Exiting.')
+      process.exit(1)
+    }
+  }
+
+  try {
+    await seed()
+  } catch (e) {
+    console.error('Seed failed, continuing startup (seed error):', e && e.message || e)
+  }
+
+  // ensure new columns exist on older DB files (e.g. packageId added later)
+  try {
+    const qi = sequelize.getQueryInterface()
+    const DataTypes = require('sequelize').DataTypes
+    const desc = await qi.describeTable('Deposits').catch(() => null)
+    if (desc && !desc.packageId) {
+      console.log('Adding missing column `packageId` to Deposits table')
+      await qi.addColumn('Deposits', 'packageId', { type: DataTypes.STRING, allowNull: true })
+    }
+  } catch (e) {
+    console.error('Could not ensure Deposits.packageId column:', e && e.message || e)
+  }
+
+  // Listen on all interfaces so the server is reachable from external hosts
+  app.listen(PORT, '0.0.0.0', () => console.log('Backend running on', PORT, 'and bound to 0.0.0.0'))
+}
+
+process.on('uncaughtException', (e) => console.error('CRITICAL UNCAUGHT EXCEPTION:', e))
+process.on('unhandledRejection', (e) => console.error('CRITICAL UNHANDLED REJECTION:', e))
+
+start()
