@@ -16,12 +16,10 @@ export function getApiBase() {
   if (isDev && BASE === '/api') {
     return 'http://localhost:3000'
   }
-  // In production, if BASE is relative (starts with /), use current origin
-  if (BASE.startsWith('/')) {
-    return typeof window !== 'undefined' ? window.location.origin : ''
-  }
-  // If BASE is absolute URL, extract the base without /api
-  return BASE.replace('/api', '')
+  // In production with nginx, uploads are served at /api/uploads
+  // So we return empty string to make URLs like: '' + '/uploads/xxx' = '/uploads/xxx'
+  // which nginx will proxy to backend
+  return ''
 }
 
 if (isDev) console.info('[api] running in development mode, API base =', BASE)
