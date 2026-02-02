@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import ReactDOM from 'react-dom'
 import api from '../services/api'
 import { useToast } from '../components/Toast'
 
@@ -14,6 +15,8 @@ export default function Wallet() {
   const [amount, setAmount] = useState('')
   const [payoutMethod, setPayoutMethod] = useState(user?.payoutMethod || 'JazzCash')
   const [loading, setLoading] = useState(false)
+
+  const [showLockModal, setShowLockModal] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -47,7 +50,11 @@ export default function Wallet() {
     try {
       const r = await api.withdraw({ amount, method: payoutMethod, account: user?.payoutAccount || 'Not set' })
       if (r.error) {
-        toast.show(r.error, 'error')
+        if (r.error === 'WITHDRAWAL_LOCKED') {
+          setShowLockModal(true)
+        } else {
+          toast.show(r.error, 'error')
+        }
         setLoading(false)
         return
       }
@@ -69,7 +76,7 @@ export default function Wallet() {
   }
 
   return (
-    <div className="animate-premium-in space-y-8">
+    <div className="animate-premium-in space-y-8 relative">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h1 className="section-title">Withdraw Funds</h1>
@@ -108,7 +115,7 @@ export default function Wallet() {
                 {loading ? 'Processing...' : 'Withdraw Now'}
               </button>
               <p className="text-[10px] text-text-dim text-center mt-4">
-                * A 10% service fee is applied to all withdrawals.
+                * A 15% service fee is applied to all withdrawals.
               </p>
             </form>
           </div>
@@ -153,6 +160,54 @@ export default function Wallet() {
           </div>
         </div>
       </div>
+
+      {showLockModal && (
+        <Portal>
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+            <div className="glass-card max-w-md w-full p-6 relative border-accent/20 animate-scale-up shadow-2xl">
+              <button
+                onClick={() => setShowLockModal(false)}
+                className="absolute top-4 right-4 text-text-dim hover:text-white transition-colors"
+                type="button"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
+                  <i className="ri-lock-2-line text-3xl text-accent"></i>
+                </div>
+
+                <h3 className="text-xl font-bold text-white">Unlock Withdrawal</h3>
+
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-left space-y-4">
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    Invite minimum 3 friends and at least 1 of them must deposit to unlock withdrawal. This will double your commission.
+                  </p>
+                  <div className="h-px bg-white/10"></div>
+                  <p className="text-sm text-text-secondary leading-relaxed font-urdu text-right" style={{ fontFamily: 'Noto Nastaliq Urdu, serif' }}>
+                    کم از کم 3 دوستوں کو مدعو کریں اور ان میں سے کم از کم 1 کو ڈپازٹ کرنا ضروری ہے تاکہ ودڈرال ان لاک ہو سکے۔ اس سے آپ کا کمیشن دوگنا ہو جائے گا۔
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => { setShowLockModal(false); navigate('/referrals') }}
+                  className="btn-premium w-full py-3 mt-4"
+                >
+                  Go to Referrals <i className="ri-arrow-right-line ml-2"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
     </div>
   )
+}
+
+// Simple Portal component to render children into body
+function Portal({ children }) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  return mounted ? ReactDOM.createPortal(children, document.body) : null
 }

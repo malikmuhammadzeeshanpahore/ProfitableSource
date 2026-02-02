@@ -4,19 +4,27 @@ import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast'
 
 export default function Auth() {
-  const urlParams = new URLSearchParams(window.location.search)
-  const tabParam = urlParams.get('tab')
-  const refParam = urlParams.get('ref')
-
-  const [isLogin, setIsLogin] = useState(tabParam !== 'signup') // Auto-switch to signup if tab=signup
+  const [isLogin, setIsLogin] = useState(true)
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [inviteCode, setInviteCode] = useState(refParam || '')
+  const [inviteCode, setInviteCode] = useState('')
   const navigate = useNavigate()
   const toast = useToast()
 
   React.useEffect(() => {
+    // Parse query params properly on mount
+    const urlParams = new URLSearchParams(window.location.search)
+    const refParam = urlParams.get('ref')
+    const tabParam = urlParams.get('tab')
+
+    if (refParam) {
+      setInviteCode(refParam)
+      setIsLogin(false) // Switch to signup if ref is present
+    } else if (tabParam === 'signup') {
+      setIsLogin(false)
+    }
+
     fetch('https://api.ipify.org?format=json')
       .then(res => res.json())
       .then(data => {

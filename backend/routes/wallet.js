@@ -23,10 +23,48 @@ router.post('/withdraw', authenticate, async (req, res) => {
   if (!amount || amount < 30) return res.status(400).json({ error: 'Minimum withdraw is 30' })
   if (req.user.wallet < amount) return res.status(400).json({ error: 'Insufficient balance' })
 
+  // Requirement: User must have an active plan to withdraw
+  if (!req.user.currentPackageId) {
+    return res.status(400).json({ error: 'You must have an active plan to request a withdrawal.' })
+  }
+
+  // WITHDRAWAL LOCK CHECK
+  // Requirement: 3 referrals, at least 1 must have an approved deposit
+  try {
+    const referrals = await models.User.findAll({ where: { referredBy: req.user.id }, attributes: ['id'] })
+    const referralCount = referrals.length
+
+    let activeReferralCount = 0
+    if (referralCount >= 3) {
+      const referralIds = referrals.map(u => u.id)
+      const activeDeposits = await models.Deposit.count({
+        where: {
+          userId: referralIds,
+          status: 'approved'
+        },
+        distinct: true,
+        col: 'userId'
+      })
+      activeReferralCount = activeDeposits
+    }
+
+    // Condition: Must have at least 3 referrals AND at least 1 active referral (who made a deposit)
+    if (referralCount < 3 || activeReferralCount < 1) {
+      return res.status(400).json({
+        error: 'WITHDRAWAL_LOCKED',
+        message: 'Withdrawal is locked',
+        stats: { referrals: referralCount, active: activeReferralCount }
+      })
+    }
+  } catch (e) {
+    console.error('Withdrawal lock check failed', e)
+    return res.status(500).json({ error: 'server error during verification' })
+  }
+
   // No withdrawal limits - users can withdraw anytime, any number of times per day
 
-  // apply 10% tax/fee
-  const fee = Math.round((amount * 0.10) * 100) / 100
+  // apply 15% tax/fee (Updated from 10%)
+  const fee = Math.round((amount * 0.15) * 100) / 100
   const net = Math.round((amount - fee) * 100) / 100
   // create pending withdrawal transaction and reduce wallet immediately; admin can approve/reject (reject will refund)
   req.user.wallet = Math.round(((req.user.wallet || 0) - amount) * 100) / 100

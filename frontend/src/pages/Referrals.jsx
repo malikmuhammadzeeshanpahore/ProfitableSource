@@ -20,7 +20,7 @@ export default function Referrals() {
     load()
   }, [])
 
-  const inviteLink = `${window.location.origin}/auth?ref=${user.inviteCode}`
+  const inviteLink = `${window.location.origin}/auth?tab=signup&ref=${user.inviteCode}`
 
   return (
     <div className="animate-premium-in space-y-12">
